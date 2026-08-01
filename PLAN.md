@@ -63,8 +63,8 @@
 
 ---
 
-### Phase 3 — Config and composition root
-- [ ] Full Zod env schema with clear messages
+### Phase 3 — Config and composition root ✅
+- [x] Full Zod env schema with clear messages
 - [ ] Multi-layer config: defaults → yaml → env vars
 - [ ] Per-repo config mapping
 - [ ] `redactConfig()` + test that no secret fields appear in logs
@@ -231,4 +231,4 @@ _(append as discovered)_
 
 ---
 
-## Current Phase: 3 — Config and composition root
+## Current Phase: 4 — HTTP layer
