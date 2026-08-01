@@ -33,6 +33,7 @@ export default [
       ],
       "@typescript-eslint/consistent-type-imports": "error",
       "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/dot-notation": ["error", { allowIndexSignaturePropertyAccess: true }],
       "no-console": "error",
     },
   },
