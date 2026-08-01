@@ -7,6 +7,7 @@ import { createErrorHandler } from "./middleware/error-handler.js";
 import { healthRouter, readyRouter } from "./routes/health.js";
 import { webhooksRouter, manualTriggerRouter } from "./routes/webhooks.js";
 import { runsRouter } from "./routes/runs.js";
+import { metricsRouter } from "./routes/metrics.js";
 import type { Container } from "@/composition/container.js";
 
 // Ensure Express type augmentations are loaded
@@ -37,6 +38,7 @@ export function createApp(container: Container): express.Express {
 
   app.use("/healthz", healthRouter());
   app.use("/readyz", readyRouter(container));
+  app.use("/metrics", metricsRouter());
   app.use("/webhooks", webhookLimiter, webhooksRouter(container));
   app.use("/api/runs", runsRouter(container));
   app.use("/api/tasks", manualTriggerRouter(container));

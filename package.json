@@ -21,5 +21,8 @@
     "husky": "^9.1.7",
     "prettier": "^3.4.2",
     "turbo": "^2.3.3"
+  },
+  "dependencies": {
+    "prom-client": "^15.1.3"
   }
 }
