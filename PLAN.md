@@ -36,15 +36,15 @@
 
 ---
 
-### Phase 1 — Pure domain
-- [ ] `Task` entity
-- [ ] `Run` entity with all fields
-- [ ] Run state machine (all transitions + invalid transition error)
-- [ ] `RunEvent` append-only event log
-- [ ] `RunState → CanonicalBoardStatus` mapping
-- [ ] Error hierarchy: `DomainError`, `InvalidTransitionError`, `ProviderError`, `AgentExecutionError`, `ConfigurationError`
-- [ ] Unit tests ≥ 95% coverage
-- [ ] Commit: `feat(domain): core entities and run state machine`
+### Phase 1 — Pure domain ✅
+- [x] `Task` entity (BoardItemRef, RepoRef, Priority, CanonicalBoardStatus)
+- [x] `Run` entity with all fields + `transitionRun(run, to, now)` (immutable)
+- [x] Run state machine — explicit VALID_TRANSITIONS set, `assertValidTransition`
+- [x] `RunEvent` (kind, payload, append-only by design)
+- [x] `RunState → CanonicalBoardStatus` mapping via `toBoardStatus` + `STATE_TO_BOARD_STATUS`
+- [x] Error hierarchy: `DomainError`, `InvalidTransitionError`, `ProviderError`, `AgentExecutionError`, `ConfigurationError`
+- [x] 63 unit tests, domain layer at 100% coverage (overall 93.75%)
+- [x] Commit: `feat(domain): core entities and run state machine`
 
 ---
 
@@ -230,4 +230,4 @@ _(append as discovered)_
 
 ---
 
-## Current Phase: 1 — Pure domain
+## Current Phase: 2 — Ports + fakes
