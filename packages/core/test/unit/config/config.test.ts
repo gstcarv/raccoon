@@ -11,8 +11,8 @@ describe("loadConfig", () => {
     const cfg = loadConfig(REQUIRED_ENV);
     expect(cfg.env.PORT).toBe(3000);
     expect(cfg.env.LOG_LEVEL).toBe("info");
-    expect(cfg.env.RACCOON_COAUTHOR_NAME).toBe("Raccoon Bandit");
-    expect(cfg.env.RACCOON_COAUTHOR_EMAIL).toBe("bandit@raccoon.dev");
+    expect(cfg.env.RACCOON_COAUTHOR_NAME).toBe("Raccoon Builder");
+    expect(cfg.env.RACCOON_COAUTHOR_EMAIL).toBe("builder@raccoon.dev");
     expect(cfg.env.CLAUDE_CODE_PATH).toBe("claude");
   });
 
@@ -86,7 +86,7 @@ describe("redactEnv", () => {
     const redacted = cfg.redacted;
     expect(redacted["PORT"]).toBe(3000);
     expect(redacted["LOG_LEVEL"]).toBe("info");
-    expect(redacted["RACCOON_COAUTHOR_NAME"]).toBe("Raccoon Bandit");
+    expect(redacted["RACCOON_COAUTHOR_NAME"]).toBe("Raccoon Builder");
   });
 
   it("no real token value appears in redacted output", () => {

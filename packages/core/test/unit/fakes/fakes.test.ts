@@ -120,8 +120,8 @@ describe("FakeWorkspaceManager", () => {
       "raccoon/task-2" as BranchName,
     );
     const sha = await wm.commitAll(ws, "feat: x", {
-      name: "Raccoon Bandit",
-      email: "bandit@raccoon.dev",
+      name: "Raccoon Builder",
+      email: "builder@raccoon.dev",
     });
     expect(sha).not.toBeNull();
     await wm.dispose(ws);
