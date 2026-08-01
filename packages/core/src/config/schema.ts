@@ -27,7 +27,7 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: positiveInt(3000),
   LOG_LEVEL: z
-    .enum(["fatal", "error", "warn", "info", "debug", "trace"])
+    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
 
   RACCOON_BASE_URL: z.string().url().default("http://localhost:3000"),
