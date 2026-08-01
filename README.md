@@ -1,40 +1,84 @@
-# raccoon 🦝
+# raccoon
 
-> Autonomous coding agent orchestration — connects to your task board, ships code, opens PRs, does review, moves cards to Done.
-
-**Status:** Early development (Phase 0/14)
+> Autonomous coding agent orchestration — connects to your GitHub Projects board, implements tasks with Claude Code, opens PRs, reviews code, and moves cards to Done.
 
 ## What it does
 
-raccoon watches your GitHub Projects board. When a card enters "Backlog", it:
+raccoon watches your GitHub Projects v2 board. When a card is moved to the right column, it:
 
-1. Spins up a Claude Code agent in a git worktree
-2. Implements the task following your repo conventions
-3. Runs your test suite; self-corrects on failure
-4. Opens a PR, posts a code review, moves the card to "In Review"
-5. Optionally auto-merges when checks pass and moves to "Done"
+1. Creates a git worktree for the task
+2. Spawns a Claude Code agent (`claude -p`) with the task prompt and your repo's skills
+3. Commits the changes with a co-author trailer
+4. Pushes the branch and opens a pull request
+5. Posts a review comment and moves the board card to "In Review"
+
+## Quick start
+
+```bash
+# 1. Clone and install
+git clone https://github.com/gstcarv/raccoon.git
+cd raccoon
+pnpm install
+
+# 2. Configure
+cp packages/core/.env.example .env
+# Edit .env — at minimum: GITHUB_WEBHOOK_SECRET, GITHUB_TOKEN, CLAUDE_CODE_OAUTH_TOKEN
+
+# 3. Check your setup
+pnpm raccoon doctor
+
+# 4. Start
+pnpm dev
+```
+
+Or with Docker:
+
+```bash
+cp packages/core/.env.example .env
+docker compose up -d
+```
+
+See [`docs/guides/deployment.md`](docs/guides/deployment.md) for full setup instructions.
+
+## Architecture
+
+Hexagonal architecture — domain has zero I/O, all external interactions go through typed ports with swappable adapters.
+
+See [`docs/architecture.md`](docs/architecture.md) for diagrams.
 
 ## Stack
 
-- Node.js 22 LTS, TypeScript strict, ESM
-- Express 5, Zod, Pino, Vitest
-- Claude Code CLI (`claude -p`) as the agent executor
-- GitHub Projects v2 (GraphQL) + GitHub REST API
-- Drizzle ORM + SQLite (Postgres optional)
-- BullMQ + Redis optional (in-memory default)
-
-## Quickstart
-
-_Coming after Phase 12. See `docs/guides/deployment.md`._
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Node.js 22 LTS, TypeScript strict, ESM |
+| HTTP | Express 5, Zod, Pino, prom-client |
+| Agent | Claude Code CLI (`claude -p`), NDJSON streaming |
+| Board | GitHub Projects v2 (GraphQL) |
+| VCS | GitHub REST API (Octokit) |
+| Git | simple-git, worktrees, GIT_ASKPASS credentials |
+| Persistence | Drizzle ORM + SQLite (default) |
+| Queue | In-memory (default) or BullMQ + Redis |
+| Tests | Vitest + fake adapter contract tests |
+| Infra | Docker multi-stage, tini, GitHub Actions CI |
 
 ## Board provider support
 
 | Provider | Status |
 |----------|--------|
-| GitHub Projects v2 | ✅ Planned (Phase 5) |
-| Trello | 🚧 Scaffold only |
-| Jira | 🚧 Scaffold only |
-| ClickUp | 🚧 Scaffold only |
+| GitHub Projects v2 | Implemented |
+
+## Security
+
+See [SECURITY.md](SECURITY.md). Key points:
+
+- Secrets are never committed or logged — all redacted as `[REDACTED]`
+- GIT credentials injected via `GIT_ASKPASS`, never in remote URLs
+- Webhook payloads verified with HMAC-SHA256 + `timingSafeEqual`
+- `--dangerously-skip-permissions` only enabled via explicit env flag with boot warning
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
