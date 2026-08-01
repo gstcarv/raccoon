@@ -48,17 +48,18 @@
 
 ---
 
-### Phase 2 — Ports + fakes
-- [ ] `BoardProvider` interface
-- [ ] `VcsProvider` interface
-- [ ] `AgentRunner` interface
-- [ ] `WorkspaceManager` interface
-- [ ] `JobQueue` interface
-- [ ] `RunStore` interface
-- [ ] `clock.ts` port
-- [ ] Fake implementations in `test/fakes/`
-- [ ] Contract tests (reusable per port)
-- [ ] Commit: `feat(ports): define provider contracts and test fakes`
+### Phase 2 — Ports + fakes ✅
+- [x] `BoardProvider` interface (verifyWebhook, parseEvent, fetchTask, moveTask, comment)
+- [x] `VcsProvider` interface (getCloneUrl, openPullRequest, commentOnPR, getChecks)
+- [x] `AgentRunner` interface (run with AbortSignal)
+- [x] `WorkspaceManager` interface (prepare, commitAll, push, dispose)
+- [x] `JobQueue` interface (enqueue, process, shutdown)
+- [x] `RunStore` interface (save, get, listActive, appendEvent, claim)
+- [x] `Clock` port + systemClock
+- [x] Fake implementations in `test/fakes/` for all 6 ports
+- [x] Reusable contract tests for BoardProvider, RunStore, JobQueue
+- [x] 84 tests, all passing
+- [x] Commit: `feat(ports): define provider contracts and test fakes`
 
 ---
 
@@ -230,4 +231,4 @@ _(append as discovered)_
 
 ---
 
-## Current Phase: 2 — Ports + fakes
+## Current Phase: 3 — Config and composition root
