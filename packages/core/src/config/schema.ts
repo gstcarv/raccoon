@@ -32,7 +32,7 @@ export const envSchema = z.object({
 
   RACCOON_BASE_URL: z.string().url().default("http://localhost:3000"),
   RACCOON_COAUTHOR_NAME: z.string().default("Raccoon Builder"),
-  RACCOON_COAUTHOR_EMAIL: z.string().email().default("builder@raccoon.dev"),
+  RACCOON_COAUTHOR_EMAIL: z.string().default("raccoon-builder@noreply"),
   RACCOON_WORKSPACE_DIR: z.string().default("./data/workspaces"),
   RACCOON_MAX_CONCURRENT_RUNS: positiveInt(3),
   RACCOON_RUN_TIMEOUT_MS: positiveInt(30 * 60 * 1000), // 30 min

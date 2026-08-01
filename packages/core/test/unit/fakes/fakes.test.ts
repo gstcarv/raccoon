@@ -121,7 +121,7 @@ describe("FakeWorkspaceManager", () => {
     );
     const sha = await wm.commitAll(ws, "feat: x", {
       name: "Raccoon Builder",
-      email: "builder@raccoon.dev",
+      email: "raccoon-builder@noreply",
     });
     expect(sha).not.toBeNull();
     await wm.dispose(ws);

@@ -9,7 +9,7 @@
 |---|----------|----------|-----------|
 | 1 | Git library: `simple-git` vs `isomorphic-git` | **`simple-git`** | Spawns real git binary — same semantics as the spec's worktree commands; no pure-JS quirks |
 | 2 | `bullmq` queue: optional or default | **in-memory default**, BullMQ when `REDIS_URL` set | Spec says so explicitly |
-| 3 | Co-author default name | **`Raccoon Builder <builder@raccoon.dev>`** | Spec lists this as default |
+| 3 | Co-author default name | **`Raccoon Builder <raccoon-builder@noreply>`** | Spec lists this as default |
 | 4 | `--dangerously-skip-permissions` | Behind `RACCOON_ALLOW_DANGEROUS_PERMISSIONS=true` flag, with warning in boot log and docs | Security guardrail |
 | 5 | GitHub App vs PAT | Both supported via `GitHubAuthProvider` abstraction; App preferred | Spec says App preferred |
 | 6 | ADR format | Short: Context / Decision / Consequences | Enough, no bloat |

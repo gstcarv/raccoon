@@ -16,7 +16,7 @@ All four must pass before committing. Zero warnings on lint.
 - Conventional Commits: `feat(scope):`, `fix(scope):`, `chore:`, `docs:`, `test:`
 - Co-author trailer on every commit:
   ```
-  Co-authored-by: Raccoon Builder <builder@raccoon.dev>
+  Co-authored-by: Raccoon Builder <raccoon-builder@noreply>
   ```
 
 ## Architecture boundaries

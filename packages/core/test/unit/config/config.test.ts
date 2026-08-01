@@ -12,7 +12,7 @@ describe("loadConfig", () => {
     expect(cfg.env.PORT).toBe(3000);
     expect(cfg.env.LOG_LEVEL).toBe("info");
     expect(cfg.env.RACCOON_COAUTHOR_NAME).toBe("Raccoon Builder");
-    expect(cfg.env.RACCOON_COAUTHOR_EMAIL).toBe("builder@raccoon.dev");
+    expect(cfg.env.RACCOON_COAUTHOR_EMAIL).toBe("raccoon-builder@noreply");
     expect(cfg.env.CLAUDE_CODE_PATH).toBe("claude");
   });
 
