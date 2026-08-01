@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.local
+*.env
+coverage/
+data/
+workspace/
+runs/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+*.log
+pnpm-lock.yaml.bak
+.turbo/
