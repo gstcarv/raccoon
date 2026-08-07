@@ -228,6 +228,28 @@ _(append as discovered)_
 ## ADR Index
 
 - [0001 — Hexagonal Architecture](docs/adr/0001-hexagonal-architecture.md)
+- [0002 — Serializable Runner Boundary](packages/core/docs/adr/0002-runner-boundary.md)
+- [0003 — Dynamic Multi-Agent Catalog](packages/core/docs/adr/0003-dynamic-multi-agent.md)
+
+---
+
+## Refactor: runner-ready + multi-agent ✅ (2026-08-07)
+- [x] ADR 0002: serializable `AgentInvocation` runner boundary
+- [x] ADR 0003: dynamic multi-agent catalog
+- [x] `src/domain/agent/index.ts` — `AgentDefinition`, `AgentSpec`, `McpServerRef`
+- [x] `src/ports/runner.ts` — `Runner` port with `invoke(AgentInvocation, signal?)` (replaces `AgentRunner`)
+- [x] `src/skills/prompts.ts` — `buildPrompt` generalized to accept skills list
+- [x] `src/skills/mcp.ts` — `resolveMcpServers(ids, env)` + `mcpRefsToConfig`; MCP materialization in runner
+- [x] `src/skills/agent-registry.ts` — `loadCatalog`, `resolveAgent`
+- [x] `assets/agents/{engineer,code-reviewer,qa,designer}/agent.json` — catalog files
+- [x] `src/adapters/agent/claude-code/index.ts` — implements `Runner`; self-contained MCP materialization
+- [x] `src/domain/run/index.ts` — `currentAgent` field
+- [x] `src/adapters/store/sqlite-run-store.ts` — persists `currentAgent`
+- [x] `src/config/schema.ts` — `RACCOON_AGENTS_DIR`, `RACCOON_DEFAULT_AGENTS`, `agents` per repo
+- [x] `src/pipeline/index.ts` — linear loop over agent catalog; `AGENT_STATE_MAP`
+- [x] `src/composition/container.ts` — `runner` + `agentCatalog` (replaces `agentRunner`)
+- [x] `src/server.ts` — loads catalog at boot, wires `ClaudeCodeRunner` as `Runner`
+- [x] Gate: 114 tests passing, typecheck + lint + build green
 
 ---
 

@@ -17,6 +17,7 @@ const makeRun = (overrides: Partial<Run> = {}): Run => ({
   prUrl: null,
   sessionId: null,
   errorMessage: null,
+  currentAgent: null,
   ...overrides,
 });
 

@@ -1,0 +1,10 @@
+{
+  "id": "designer",
+  "name": "Designer",
+  "description": "Designs UI components and writes front-end code following established design conventions.",
+  "skills": ["raccoon-workflow"],
+  "mcp": [],
+  "allowedTools": ["Read", "Write", "Edit"],
+  "model": null,
+  "maxTurns": 30
+}

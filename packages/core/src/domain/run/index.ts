@@ -33,6 +33,7 @@ export interface Run {
   readonly prUrl: string | null;
   readonly sessionId: SessionId | null;
   readonly errorMessage: string | null;
+  readonly currentAgent: string | null;
 }
 
 export type RunEventKind =

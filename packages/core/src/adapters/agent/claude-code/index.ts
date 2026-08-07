@@ -3,8 +3,9 @@ import { createWriteStream } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
-import type { AgentRunner, AgentRunInput, AgentRunResult } from "@/ports/agent-runner.js";
+import type { Runner, AgentInvocation, AgentRunResult } from "@/ports/runner.js";
 import type { Env } from "@/config/schema.js";
+import { mcpRefsToConfig, materializeMcpConfig } from "@/skills/mcp.js";
 
 // NDJSON message types emitted by claude -p --output-format stream-json
 interface ClaudeMessage {
@@ -16,21 +17,29 @@ interface ClaudeMessage {
 const COST_PER_INPUT_TOKEN = 3e-6;
 const COST_PER_OUTPUT_TOKEN = 15e-6;
 
-export class ClaudeCodeRunner implements AgentRunner {
+export class ClaudeCodeRunner implements Runner {
   readonly id = "claude-code";
 
   constructor(private readonly env: Env) {}
 
-  async run(input: AgentRunInput): Promise<AgentRunResult> {
+  async invoke(input: AgentInvocation, signal?: AbortSignal): Promise<AgentRunResult> {
     const start = Date.now();
     const logsDir = join(this.env.RACCOON_WORKSPACE_DIR, input.runId, ".raccoon");
     await mkdir(logsDir, { recursive: true });
 
-    const outputPath = join(logsDir, "claude-output.ndjson");
+    const outputPath = join(logsDir, `${input.agent.id}-output.ndjson`);
     const logStream = createWriteStream(outputPath, { flags: "a" });
 
-    const args = this.buildArgs(input);
-    const env = this.buildEnv(input);
+    // Materialize MCP config from resolved refs — runner is self-contained.
+    const mcpConfig = mcpRefsToConfig(input.agent.mcpServers);
+    let mcpConfigPath: string | null = null;
+    let mcpDispose: (() => Promise<void>) | null = null;
+
+    if (mcpConfig) {
+      const materialized = await materializeMcpConfig(mcpConfig);
+      mcpConfigPath = materialized.path;
+      mcpDispose = materialized.dispose;
+    }
 
     let sessionId = input.sessionId ?? "";
     let inputTokens = 0;
@@ -38,10 +47,13 @@ export class ClaudeCodeRunner implements AgentRunner {
     let exitCode = 0;
 
     try {
+      const args = this.buildArgs(input, mcpConfigPath);
+      const procEnv = this.buildEnv(input, mcpConfigPath);
+
       const proc = execa(this.env.CLAUDE_CODE_PATH, args, {
-        cwd: input.workingDir,
-        env,
-        ...(input.signal ? { cancelSignal: input.signal } : {}),
+        cwd: input.workspace.path,
+        env: procEnv,
+        ...(signal ? { cancelSignal: signal } : {}),
         all: true,
         reject: false,
       });
@@ -64,11 +76,13 @@ export class ClaudeCodeRunner implements AgentRunner {
       exitCode = result.exitCode ?? 1;
     } finally {
       logStream.end();
+      if (mcpDispose) await mcpDispose();
     }
 
-    const costUsd = inputTokens > 0 || outputTokens > 0
-      ? inputTokens * COST_PER_INPUT_TOKEN + outputTokens * COST_PER_OUTPUT_TOKEN
-      : null;
+    const costUsd =
+      inputTokens > 0 || outputTokens > 0
+        ? inputTokens * COST_PER_INPUT_TOKEN + outputTokens * COST_PER_OUTPUT_TOKEN
+        : null;
 
     return {
       sessionId: sessionId || input.runId,
@@ -80,28 +94,32 @@ export class ClaudeCodeRunner implements AgentRunner {
     };
   }
 
-  private buildArgs(input: AgentRunInput): string[] {
+  private buildArgs(input: AgentInvocation, mcpConfigPath: string | null): string[] {
+    const agent = input.agent;
     const args = [
       "--print",
       "--verbose",
-      "--output-format", "stream-json",
-      "--max-turns", String(input.maxTurns),
+      "--output-format",
+      "stream-json",
+      "--max-turns",
+      String(agent.maxTurns),
     ];
 
     if (input.sessionId) {
       args.push("--resume", input.sessionId);
     }
 
-    if (input.allowedTools.length > 0) {
-      args.push("--allowedTools", input.allowedTools.join(","));
+    if (agent.allowedTools.length > 0) {
+      args.push("--allowedTools", agent.allowedTools.join(","));
     }
 
-    if (input.mcpConfigPath) {
-      args.push("--mcp-config", input.mcpConfigPath);
+    if (mcpConfigPath) {
+      args.push("--mcp-config", mcpConfigPath);
     }
 
-    if (this.env.CLAUDE_MODEL) {
-      args.push("--model", this.env.CLAUDE_MODEL);
+    const model = agent.model ?? this.env.CLAUDE_MODEL;
+    if (model) {
+      args.push("--model", model);
     }
 
     if (this.env.RACCOON_ALLOW_DANGEROUS_PERMISSIONS) {
@@ -109,19 +127,22 @@ export class ClaudeCodeRunner implements AgentRunner {
       args.push("--dangerously-skip-permissions");
     }
 
-    args.push("--", input.prompt);
+    args.push("--", agent.prompt);
     return args;
   }
 
-  private buildEnv(input: AgentRunInput): Record<string, string | undefined> {
+  private buildEnv(
+    input: AgentInvocation,
+    mcpConfigPath: string | null,
+  ): Record<string, string | undefined> {
     const env: Record<string, string | undefined> = { ...process.env };
 
     if (this.env.CLAUDE_CODE_OAUTH_TOKEN) {
       env["CLAUDE_CODE_OAUTH_TOKEN"] = this.env.CLAUDE_CODE_OAUTH_TOKEN;
     }
 
-    if (input.mcpConfigPath) {
-      env["CLAUDE_MCP_CONFIG_PATH"] = input.mcpConfigPath;
+    if (mcpConfigPath) {
+      env["CLAUDE_MCP_CONFIG_PATH"] = mcpConfigPath;
     }
 
     // Redact secrets from child process env to avoid leakage
@@ -129,6 +150,7 @@ export class ClaudeCodeRunner implements AgentRunner {
     delete env["GITHUB_APP_PRIVATE_KEY"];
     delete env["GITHUB_WEBHOOK_SECRET"];
 
+    void input; // input used for mcpConfigPath and sessionId — workspace.path set as cwd
     return env;
   }
 }

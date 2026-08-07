@@ -17,6 +17,7 @@ const makeRun = (id: string, state: Run["state"] = "QUEUED"): Run => ({
   prUrl: null,
   sessionId: null,
   errorMessage: null,
+  currentAgent: null,
 });
 
 export function runStoreContract(name: string, factory: () => RunStore): void {

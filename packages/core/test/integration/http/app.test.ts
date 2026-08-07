@@ -5,7 +5,7 @@ import { createApp } from "@/adapters/http/app.js";
 import { systemClock } from "@/ports/clock.js";
 import { FakeBoardProvider } from "../../fakes/fake-board-provider.js";
 import { FakeVcsProvider } from "../../fakes/fake-vcs-provider.js";
-import { FakeAgentRunner } from "../../fakes/fake-agent-runner.js";
+import { FakeRunner } from "../../fakes/fake-runner.js";
 import { FakeWorkspaceManager } from "../../fakes/fake-workspace-manager.js";
 import { FakeJobQueue } from "../../fakes/fake-job-queue.js";
 import { FakeRunStore } from "../../fakes/fake-run-store.js";
@@ -40,6 +40,8 @@ const minEnv: Env = {
   DATABASE_URL: "file::memory:",
   REDIS_URL: undefined,
   MCP_GITHUB_TOKEN: undefined,
+  RACCOON_AGENTS_DIR: "./assets/agents",
+  RACCOON_DEFAULT_AGENTS: "engineer",
 };
 
 function makeContainer(): {
@@ -57,7 +59,8 @@ function makeContainer(): {
     clock: systemClock,
     boardProviders: new Map([["fake-board", board]]),
     vcsProvider: new FakeVcsProvider(),
-    agentRunner: new FakeAgentRunner(),
+    runner: new FakeRunner(),
+    agentCatalog: new Map(),
     workspaceManager: new FakeWorkspaceManager(),
     jobQueue: queue,
     runStore: store,
@@ -186,6 +189,7 @@ const makeRun = (id: string): Run => ({
   prUrl: null,
   sessionId: null,
   errorMessage: "oops",
+  currentAgent: null,
 });
 
 describe("GET /api/runs", () => {

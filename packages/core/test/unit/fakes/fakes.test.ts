@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FakeBoardProvider } from "../../fakes/fake-board-provider.js";
 import { FakeVcsProvider } from "../../fakes/fake-vcs-provider.js";
-import { FakeAgentRunner } from "../../fakes/fake-agent-runner.js";
+import { FakeRunner } from "../../fakes/fake-runner.js";
 import { FakeWorkspaceManager } from "../../fakes/fake-workspace-manager.js";
 import { FakeRunStore } from "../../fakes/fake-run-store.js";
 import { FakeJobQueue } from "../../fakes/fake-job-queue.js";
@@ -68,34 +68,36 @@ describe("FakeVcsProvider", () => {
   });
 });
 
-describe("FakeAgentRunner", () => {
-  it("records calls and returns success by default", async () => {
-    const runner = new FakeAgentRunner();
-    const result = await runner.run({
-      runId: "run-1",
+describe("FakeRunner", () => {
+  const makeInvocation = () => ({
+    runId: "run-1",
+    agent: {
+      id: "engineer",
+      name: "Engineer",
+      description: "test",
       prompt: "do the thing",
-      workingDir: "/tmp/ws",
-      allowedTools: ["Read", "Edit"],
+      allowedTools: ["Read", "Edit"] as string[],
+      mcpServers: [],
+      model: null,
       maxTurns: 10,
-      mcpConfigPath: null,
-      sessionId: null,
-    });
+    },
+    task: { title: "T", description: "D", owner: "acme", repo: "api" },
+    workspace: { path: "/tmp/ws", branch: "raccoon/t-1" },
+    sessionId: null,
+    limits: { timeoutMs: 30000 },
+  });
+
+  it("records invocations and returns success by default", async () => {
+    const runner = new FakeRunner();
+    const result = await runner.invoke(makeInvocation());
     expect(result.success).toBe(true);
-    expect(runner.calls).toHaveLength(1);
+    expect(runner.invocations).toHaveLength(1);
   });
 
   it("can be set to fail", async () => {
-    const runner = new FakeAgentRunner();
+    const runner = new FakeRunner();
     runner.setFailure();
-    const result = await runner.run({
-      runId: "run-1",
-      prompt: "do the thing",
-      workingDir: "/tmp/ws",
-      allowedTools: [],
-      maxTurns: 10,
-      mcpConfigPath: null,
-      sessionId: null,
-    });
+    const result = await runner.invoke(makeInvocation());
     expect(result.success).toBe(false);
   });
 });

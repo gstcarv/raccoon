@@ -19,6 +19,8 @@ export const repoConfigSchema = z.object({
   baseBranch: z.string().default("main"),
   testCommand: z.string().optional(),
   allowAutoMerge: z.boolean().default(false),
+  // Ordered list of agent ids to run for tasks in this repo. Default: engineer only.
+  agents: z.array(z.string()).default(["engineer"]),
 });
 
 export type RepoConfig = z.infer<typeof repoConfigSchema>;
@@ -61,6 +63,11 @@ export const envSchema = z.object({
   REDIS_URL: z.string().optional(),
 
   MCP_GITHUB_TOKEN: z.string().optional(),
+
+  // Path to the agents catalog directory (contains <id>/agent.json folders).
+  RACCOON_AGENTS_DIR: z.string().default("./assets/agents"),
+  // CSV of default agent ids when no repo-level config is present.
+  RACCOON_DEFAULT_AGENTS: z.string().default("engineer"),
 });
 
 export type Env = z.infer<typeof envSchema>;

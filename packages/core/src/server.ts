@@ -1,4 +1,5 @@
 import process from "node:process";
+import { join } from "node:path";
 import { config as loadDotenv } from "dotenv";
 import { createServer } from "node:http";
 import { loadConfig } from "./config/loader.js";
@@ -15,10 +16,11 @@ import { MemoryRunStore } from "./adapters/store/memory-run-store.js";
 import { InMemoryQueue } from "./adapters/queue/in-memory-queue.js";
 import { BullMQQueue } from "./adapters/queue/bullmq-queue.js";
 import { processJob } from "./pipeline/index.js";
+import { loadCatalog } from "./skills/agent-registry.js";
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
-function main(): void {
+async function main(): Promise<void> {
   loadDotenv();
   const config = loadConfig();
 
@@ -30,12 +32,16 @@ function main(): void {
     );
   }
 
+  const agentsDir = join(process.cwd(), config.env.RACCOON_AGENTS_DIR);
+  const agentCatalog = await loadCatalog(agentsDir);
+  logger.info({ agents: [...agentCatalog.keys()] }, "agent catalog loaded");
+
   const auth = new GitHubAuth(config.env);
   const getToken = () => auth.getToken();
 
   const boardProvider = new GitHubProjectsBoardProvider(config.env);
   const vcsProvider = new GitHubVcsProvider(config.env);
-  const agentRunner = new ClaudeCodeRunner(config.env);
+  const runner = new ClaudeCodeRunner(config.env);
   const workspaceManager = new GitWorkspaceManager(vcsProvider, config.env, getToken);
 
   const runStore = config.env.DATABASE_URL.startsWith("file:")
@@ -49,7 +55,8 @@ function main(): void {
   const container = buildContainer(config, {
     boardProviders: [boardProvider],
     vcsProvider,
-    agentRunner,
+    runner,
+    agentCatalog,
     workspaceManager,
     jobQueue,
     runStore,
@@ -79,9 +86,7 @@ function main(): void {
   process.on("SIGINT", shutdown);
 }
 
-try {
-  main();
-} catch (err: unknown) {
+main().catch((err: unknown) => {
   logger.error({ err }, "fatal startup error");
   process.exit(1);
-}
+});

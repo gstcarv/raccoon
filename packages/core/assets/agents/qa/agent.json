@@ -1,0 +1,10 @@
+{
+  "id": "qa",
+  "name": "QA",
+  "description": "Validates the implementation against acceptance criteria, runs the test suite, and reports failures.",
+  "skills": ["test-discipline"],
+  "mcp": [],
+  "allowedTools": ["Bash", "Read"],
+  "model": null,
+  "maxTurns": 30
+}

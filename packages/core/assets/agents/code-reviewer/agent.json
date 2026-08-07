@@ -1,0 +1,10 @@
+{
+  "id": "code-reviewer",
+  "name": "Code Reviewer",
+  "description": "Reviews the implementation for correctness, style, and test coverage. Leaves inline comments on the PR.",
+  "skills": ["code-review"],
+  "mcp": ["github"],
+  "allowedTools": ["Read", "Bash"],
+  "model": null,
+  "maxTurns": 30
+}

@@ -1,0 +1,10 @@
+{
+  "id": "engineer",
+  "name": "Engineer",
+  "description": "Implements the task end-to-end: reads the spec, writes code, runs tests.",
+  "skills": ["raccoon-workflow", "commit-style", "pull-request", "test-discipline"],
+  "mcp": ["github"],
+  "allowedTools": ["Bash", "Read", "Write", "Edit"],
+  "model": null,
+  "maxTurns": 50
+}

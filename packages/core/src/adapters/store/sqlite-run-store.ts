@@ -30,6 +30,7 @@ const runsTable = sqliteTable("runs", {
   prUrl: text("pr_url"),
   sessionId: text("session_id"),
   errorMessage: text("error_message"),
+  currentAgent: text("current_agent"),
 });
 
 const eventsTable = sqliteTable("run_events", {
@@ -80,6 +81,7 @@ function rowToRun(row: RunRow): Run {
     prUrl: row.prUrl ?? null,
     sessionId: (row.sessionId as SessionId | null) ?? null,
     errorMessage: row.errorMessage ?? null,
+    currentAgent: row.currentAgent ?? null,
   };
 }
 
@@ -102,6 +104,7 @@ function runToRow(run: Run): RunRow {
     prUrl: run.prUrl,
     sessionId: run.sessionId,
     errorMessage: run.errorMessage,
+    currentAgent: run.currentAgent,
   };
 }
 
@@ -137,7 +140,8 @@ export class SqliteRunStore implements RunStore {
         completed_at TEXT,
         pr_url TEXT,
         session_id TEXT,
-        error_message TEXT
+        error_message TEXT,
+        current_agent TEXT
       )
     `);
     this.db.run(`

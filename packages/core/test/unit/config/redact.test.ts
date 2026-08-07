@@ -27,6 +27,8 @@ const fullEnv: Env = {
   DATABASE_URL: "file:./raccoon.db",
   REDIS_URL: undefined,
   MCP_GITHUB_TOKEN: "mcp-token",
+  RACCOON_AGENTS_DIR: "./assets/agents",
+  RACCOON_DEFAULT_AGENTS: "engineer",
 };
 
 describe("redactEnv", () => {

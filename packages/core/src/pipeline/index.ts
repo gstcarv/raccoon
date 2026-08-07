@@ -5,8 +5,8 @@ import { transitionRun } from "@/domain/run/index.js";
 import type { Task, CanonicalBoardStatus } from "@/domain/task/index.js";
 import type { BoardEvent } from "@/ports/board-provider.js";
 import type { Job } from "@/ports/job-queue.js";
-import { buildPrompt } from "@/skills/prompts.js";
-import { buildDefaultMcpConfig, materializeMcpConfig } from "@/skills/mcp.js";
+import { resolveAgent } from "@/skills/agent-registry.js";
+import type { PromptVars } from "@/skills/prompts.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -19,6 +19,13 @@ export interface ManualTriggerPayload {
   task: Task;
   providerId: string;
 }
+
+// Maps agent id to the RunState to transition to before running it.
+// Agents without an explicit mapping stay in IMPLEMENTING.
+const AGENT_STATE_MAP: Readonly<Record<string, Run["state"]>> = {
+  engineer: "IMPLEMENTING",
+  "code-reviewer": "REVIEWING",
+};
 
 // ── Pipeline entrypoint ───────────────────────────────────────────────────────
 
@@ -80,6 +87,7 @@ async function startRun(container: Container, task: Task, _providerId: string): 
     prUrl: null,
     sessionId: null,
     errorMessage: null,
+    currentAgent: null,
   };
 
   await container.runStore.save(run);
@@ -122,72 +130,86 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
     return;
   }
 
-  // Update worktreePath on run
   currentRun = { ...currentRun, worktreePath: workspace.path };
   await container.runStore.save(currentRun);
 
-  // Stage: IMPLEMENTING
-  const implementing = transitionRun(currentRun, "IMPLEMENTING", container.clock.now());
-  await container.runStore.save(implementing);
-  currentRun = implementing;
+  // Resolve agent list for this run (global default: ["engineer"])
+  const agentIds = container.config.env.RACCOON_DEFAULT_AGENTS.split(",").map((s) => s.trim()).filter(Boolean);
 
-  let agentResult;
-  let mcpDispose: (() => Promise<void>) | null = null;
+  const taskVars: PromptVars = {
+    TASK_TITLE: task.title,
+    TASK_DESCRIPTION: task.description,
+    REPO_OWNER: task.repoRef.owner,
+    REPO_NAME: task.repoRef.repo,
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => { controller.abort(); },
+    container.config.env.RACCOON_RUN_TIMEOUT_MS,
+  );
 
   try {
-    const prompt = await buildPrompt({
-      TASK_TITLE: task.title,
-      TASK_DESCRIPTION: task.description,
-      REPO_OWNER: task.repoRef.owner,
-      REPO_NAME: task.repoRef.repo,
-    });
+    // Run each agent in sequence; propagate sessionId between invocations.
+    for (const agentId of agentIds) {
+      const def = container.agentCatalog.get(agentId);
+      if (!def) {
+        log.warn({ agentId }, "agent not found in catalog — skipping");
+        continue;
+      }
 
-    let mcpConfigPath: string | null = null;
-    const mcpConfig = buildDefaultMcpConfig(container.config.env.MCP_GITHUB_TOKEN);
-    if (mcpConfig) {
-      const materialized = await materializeMcpConfig(mcpConfig);
-      mcpConfigPath = materialized.path;
-      mcpDispose = materialized.dispose;
-    }
+      const runState: Run["state"] = AGENT_STATE_MAP[agentId] ?? "IMPLEMENTING";
+      const transitioned = transitionRun(currentRun, runState, container.clock.now());
+      currentRun = { ...transitioned, currentAgent: agentId };
+      await container.runStore.save(currentRun);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => { controller.abort(); }, container.config.env.RACCOON_RUN_TIMEOUT_MS);
+      log.info({ agentId }, "invoking agent");
 
-    try {
-      agentResult = await container.agentRunner.run({
-        runId: currentRun.id,
-        prompt,
-        workingDir: workspace.path,
-        allowedTools: ["Bash", "Read", "Write", "Edit"],
-        maxTurns: 50,
-        mcpConfigPath,
-        sessionId: currentRun.sessionId,
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
+      const spec = await resolveAgent(def, taskVars, process.env);
+
+      const result = await container.runner.invoke(
+        {
+          runId: currentRun.id,
+          agent: spec,
+          task: {
+            title: task.title,
+            description: task.description,
+            owner: task.repoRef.owner,
+            repo: task.repoRef.repo,
+          },
+          workspace: { path: workspace.path, branch: currentRun.branch },
+          sessionId: currentRun.sessionId,
+          limits: { timeoutMs: container.config.env.RACCOON_RUN_TIMEOUT_MS },
+        },
+        controller.signal,
+      );
+
+      if (!result.success) {
+        clearTimeout(timeout);
+        await container.workspaceManager.dispose(workspace);
+        await failRun(
+          container,
+          currentRun,
+          null,
+          `Agent ${agentId} exited with code ${String(result.exitCode)}`,
+        );
+        return;
+      }
+
+      currentRun = {
+        ...currentRun,
+        sessionId: result.sessionId as typeof currentRun.sessionId,
+      };
+      await container.runStore.save(currentRun);
     }
   } catch (err) {
-    if (mcpDispose) await mcpDispose();
+    clearTimeout(timeout);
     await container.workspaceManager.dispose(workspace);
     await failRun(container, currentRun, err, "Agent execution failed");
     return;
   } finally {
-    if (mcpDispose) await mcpDispose();
+    clearTimeout(timeout);
   }
-
-  if (!agentResult.success) {
-    await container.workspaceManager.dispose(workspace);
-    await failRun(container, currentRun, null, `Agent exited with code ${String(agentResult.exitCode)}`);
-    return;
-  }
-
-  // Update session id
-  currentRun = {
-    ...currentRun,
-    sessionId: agentResult.sessionId as Run["sessionId"],
-  };
-  await container.runStore.save(currentRun);
 
   // Stage: VERIFYING (run test command if configured)
   const verifying = transitionRun(currentRun, "VERIFYING", container.clock.now());
@@ -242,11 +264,6 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
   await container.runStore.save(inReview);
   currentRun = inReview;
   await moveBoard(container, currentRun, "IN_REVIEW");
-
-  // Stage: REVIEWING (agent self-review)
-  const reviewing = transitionRun(currentRun, "REVIEWING", container.clock.now());
-  await container.runStore.save(reviewing);
-  currentRun = reviewing;
 
   // Stage: DONE
   const done = transitionRun(currentRun, "DONE", container.clock.now());
