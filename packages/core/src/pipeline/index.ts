@@ -20,12 +20,8 @@ export interface ManualTriggerPayload {
   providerId: string;
 }
 
-// Maps agent id to the RunState to transition to before running it.
-// Agents without an explicit mapping stay in IMPLEMENTING.
-const AGENT_STATE_MAP: Readonly<Record<string, Run["state"]>> = {
-  engineer: "IMPLEMENTING",
-  "code-reviewer": "REVIEWING",
-};
+// ponytail: all agents run in IMPLEMENTING; currentAgent field tracks which agent is active.
+// REVIEWING is reserved for post-PR review phases in future DAG support.
 
 // ── Pipeline entrypoint ───────────────────────────────────────────────────────
 
@@ -102,14 +98,15 @@ async function resumeRun(container: Container, runId: RunId): Promise<void> {
   if (!provider) return;
 
   const task = await provider.fetchTask(run.taskRef);
-  const preparing = transitionRun(run, "PREPARING", container.clock.now());
-  await container.runStore.save(preparing);
-  await executeRun(container, preparing, task);
+  // executeRun handles the RETRYING → PREPARING transition internally
+  await executeRun(container, run, task);
 }
 
 async function executeRun(container: Container, run: Run, task: Task): Promise<void> {
   const log = container.logger.child({ runId: run.id });
   let currentRun = run;
+
+  log.info({ taskTitle: task.title, repo: `${task.repoRef.owner}/${task.repoRef.repo}` }, "starting run");
 
   // Stage: PREPARING
   const preparing = transitionRun(currentRun, "PREPARING", container.clock.now());
@@ -158,9 +155,12 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
         continue;
       }
 
-      const runState: Run["state"] = AGENT_STATE_MAP[agentId] ?? "IMPLEMENTING";
-      const transitioned = transitionRun(currentRun, runState, container.clock.now());
-      currentRun = { ...transitioned, currentAgent: agentId };
+      // Only transition to IMPLEMENTING on the first agent; subsequent agents update currentAgent in-place.
+      if (currentRun.state !== "IMPLEMENTING") {
+        currentRun = { ...transitionRun(currentRun, "IMPLEMENTING", container.clock.now()), currentAgent: agentId };
+      } else {
+        currentRun = { ...currentRun, currentAgent: agentId, updatedAt: container.clock.now() };
+      }
       await container.runStore.save(currentRun);
 
       log.info({ agentId }, "invoking agent");

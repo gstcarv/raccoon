@@ -1,3 +1,4 @@
+import { logger } from "@/shared/logger.js";
 import type { Job, JobHandler, JobQueue } from "@/ports/job-queue.js";
 
 export class InMemoryQueue implements JobQueue {
@@ -6,7 +7,9 @@ export class InMemoryQueue implements JobQueue {
 
   enqueue(job: Job): Promise<void> {
     if (this.handler) {
-      this.handler(job).catch(() => undefined);
+      this.handler(job).catch((err: unknown) => {
+        logger.error({ err, jobType: job.type, jobId: job.id }, "job processing failed");
+      });
     } else {
       this.pending.push(job);
     }
@@ -16,7 +19,9 @@ export class InMemoryQueue implements JobQueue {
   process(handler: JobHandler): void {
     this.handler = handler;
     for (const job of this.pending.splice(0)) {
-      handler(job).catch(() => undefined);
+      handler(job).catch((err: unknown) => {
+        logger.error({ err, jobType: job.type, jobId: job.id }, "job processing failed");
+      });
     }
   }
 

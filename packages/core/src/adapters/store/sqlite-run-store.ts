@@ -159,6 +159,8 @@ export class SqliteRunStore implements RunStore {
         claimed_at TEXT NOT NULL
       )
     `);
+    // ponytail: additive migration for current_agent — silently skipped if column already exists
+    try { this.db.run(`ALTER TABLE runs ADD COLUMN current_agent TEXT`); } catch { /* already exists */ }
   }
 
   save(run: Run): Promise<void> {
