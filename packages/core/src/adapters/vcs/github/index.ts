@@ -31,9 +31,15 @@ export class GitHubVcsProvider implements VcsProvider {
     return new Octokit({ auth: token });
   }
 
-  getCloneUrl(repo: RepoRef): Promise<string> {
-    // Plain HTTPS URL — credentials injected via GIT_ASKPASS in WorkspaceManager
-    return Promise.resolve(`https://github.com/${repo.owner}/${repo.repo}.git`);
+  getCloneUrl(repo: RepoRef, token?: string): Promise<string> {
+    const auth = token ? `x-access-token:${token}@` : "";
+    return Promise.resolve(`https://${auth}github.com/${repo.owner}/${repo.repo}.git`);
+  }
+
+  async getDefaultBranch(repo: RepoRef): Promise<string> {
+    const kit = await this.octokit();
+    const { data } = await kit.repos.get({ owner: repo.owner, repo: repo.repo });
+    return data.default_branch;
   }
 
   async openPullRequest(input: OpenPrInput): Promise<PullRequest> {

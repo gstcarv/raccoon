@@ -1,3 +1,5 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
@@ -110,6 +112,7 @@ export class SqliteRunStore implements RunStore {
 
   constructor(databaseUrl: string) {
     const path = databaseUrl.replace(/^file:/, "");
+    mkdirSync(dirname(path), { recursive: true });
     const sqlite = new Database(path);
     this.db = drizzle(sqlite);
     this.migrate();

@@ -32,7 +32,8 @@ export interface CheckStatus {
 
 export interface VcsProvider {
   readonly id: string;
-  getCloneUrl(repo: RepoRef): Promise<string>;
+  getCloneUrl(repo: RepoRef, token?: string): Promise<string>;
+  getDefaultBranch(repo: RepoRef): Promise<string>;
   openPullRequest(input: OpenPrInput): Promise<PullRequest>;
   commentOnPullRequest(pr: PullRequestRef, body: string): Promise<void>;
   getPullRequestChecks(pr: PullRequestRef): Promise<CheckStatus>;

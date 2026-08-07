@@ -9,7 +9,7 @@ const ROOT = import.meta.dirname;
 /** @type {import("eslint").Linter.Config[]} */
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", "coverage/**"],
+    ignores: ["dist/**", "node_modules/**", "coverage/**", "data/**"],
   },
   js.configs.recommended,
   // Source — full type-checked rules

@@ -21,6 +21,10 @@ export class FakeVcsProvider implements VcsProvider {
   }
 
   // --- port impl ---
+  async getDefaultBranch(_repo: RepoRef): Promise<string> {
+    return "main";
+  }
+
   async getCloneUrl(repo: RepoRef): Promise<string> {
     return Promise.resolve(`https://github.com/${repo.owner}/${repo.repo}.git`);
   }

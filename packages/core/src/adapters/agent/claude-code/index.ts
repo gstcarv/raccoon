@@ -41,7 +41,7 @@ export class ClaudeCodeRunner implements AgentRunner {
       const proc = execa(this.env.CLAUDE_CODE_PATH, args, {
         cwd: input.workingDir,
         env,
-        signal: input.signal,
+        ...(input.signal ? { cancelSignal: input.signal } : {}),
         all: true,
         reject: false,
       });
@@ -83,6 +83,7 @@ export class ClaudeCodeRunner implements AgentRunner {
   private buildArgs(input: AgentRunInput): string[] {
     const args = [
       "--print",
+      "--verbose",
       "--output-format", "stream-json",
       "--max-turns", String(input.maxTurns),
     ];
@@ -108,7 +109,7 @@ export class ClaudeCodeRunner implements AgentRunner {
       args.push("--dangerously-skip-permissions");
     }
 
-    args.push(input.prompt);
+    args.push("--", input.prompt);
     return args;
   }
 

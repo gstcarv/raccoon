@@ -40,18 +40,18 @@ interface GhItemContent {
 
 interface GhWebhookPayload {
   action?: string;
+  changes?: {
+    field_value?: {
+      field_node_id?: string;
+      field_type?: string;
+    };
+  };
   projects_v2_item?: {
     id?: number;
     node_id?: string;
     project_node_id?: string;
     content_node_id?: string;
     content_type?: string;
-    changes?: {
-      field_value?: {
-        field_node_id?: string;
-        field_type?: string;
-      };
-    };
   };
   sender?: { login?: string };
 }
@@ -122,7 +122,7 @@ export class GitHubProjectsBoardProvider implements BoardProvider {
     if (body.action === "created") {
       return { kind: "TASK_CREATED", deliveryId, taskRef };
     }
-    if (body.action === "edited" && item.changes?.field_value) {
+    if (body.action === "edited" && body.changes?.field_value) {
       return { kind: "TASK_MOVED", deliveryId, taskRef };
     }
 

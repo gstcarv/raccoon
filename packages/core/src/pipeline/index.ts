@@ -43,6 +43,10 @@ async function handleBoardEvent(
 
   if (event.kind !== "TASK_MOVED" && event.kind !== "TASK_CREATED") return;
 
+  const activeRuns = await container.runStore.listActive();
+  const alreadyRunning = activeRuns.some((r) => r.taskRef.itemId === event.taskRef.itemId);
+  if (alreadyRunning) return;
+
   const task = await provider.fetchTask(event.taskRef);
   await startRun(container, task, providerId);
 }
@@ -220,7 +224,7 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
     pr = await container.vcsProvider.openPullRequest({
       repoRef: task.repoRef,
       branch: currentRun.branch,
-      baseBranch: "main",
+      baseBranch: await container.vcsProvider.getDefaultBranch(task.repoRef),
       title: task.title,
       body: `Automated by Raccoon\n\nRun: ${currentRun.id}`,
       draft: false,

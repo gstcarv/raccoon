@@ -15,6 +15,7 @@ import "./types.js";
 
 export function createApp(container: Container): express.Express {
   const app = express();
+  app.set("trust proxy", 1);
 
   app.use(helmet());
   app.use(requestIdMiddleware);

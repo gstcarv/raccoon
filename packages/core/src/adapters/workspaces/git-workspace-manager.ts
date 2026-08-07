@@ -1,5 +1,5 @@
-import { mkdir, rm, writeFile, chmod } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, rm, access } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { simpleGit } from "simple-git";
 import type { SimpleGit } from "simple-git";
@@ -24,19 +24,14 @@ export class GitWorkspaceManager implements WorkspaceManager {
 
   async prepare(repo: RepoRef, runId: string, branch: BranchName): Promise<Workspace> {
     const bareDir = await this.ensureBareClone(repo);
-    const worktreePath = join(this.env.RACCOON_WORKSPACE_DIR, runId);
+    const worktreePath = resolve(this.env.RACCOON_WORKSPACE_DIR, runId);
 
     await mkdir(worktreePath, { recursive: true });
 
     const git: SimpleGit = simpleGit(bareDir);
-    const askpassPath = await this.writeAskpass();
-    try {
-      await git.env({ ...process.env, GIT_ASKPASS: askpassPath }).fetch(["origin"]);
-    } finally {
-      await rm(askpassPath, { force: true });
-    }
+    await git.fetch(["origin"]);
 
-    await git.raw(["worktree", "add", "--orphan", "-b", branch, worktreePath]);
+    await git.raw(["worktree", "add", "-b", branch, worktreePath, "HEAD"]);
 
     const wt: SimpleGit = simpleGit(worktreePath);
     await wt.addConfig("user.name", this.env.RACCOON_COAUTHOR_NAME);
@@ -60,15 +55,10 @@ export class GitWorkspaceManager implements WorkspaceManager {
   }
 
   async push(ws: Workspace): Promise<void> {
+    const token = await this.getToken();
+    const authedUrl = await this.vcs.getCloneUrl(ws.repoRef, token);
     const git: SimpleGit = simpleGit(ws.path);
-    const askpassPath = await this.writeAskpass();
-    try {
-      await git
-        .env({ ...process.env, GIT_ASKPASS: askpassPath })
-        .push("origin", ws.branch, ["--set-upstream"]);
-    } finally {
-      await rm(askpassPath, { force: true });
-    }
+    await git.push(authedUrl, ws.branch, ["--set-upstream"]);
   }
 
   async dispose(ws: Workspace): Promise<void> {
@@ -87,32 +77,21 @@ export class GitWorkspaceManager implements WorkspaceManager {
     if (existing) return existing.bareDir;
 
     const bareDir = join(tmpdir(), "raccoon-bare", key.replace("/", "-"));
-    await mkdir(bareDir, { recursive: true });
 
-    const cloneUrl = await this.vcs.getCloneUrl(repo);
-    const askpassPath = await this.writeAskpass();
-    try {
+    const alreadyCloned = await access(join(bareDir, "HEAD")).then(() => true).catch(() => false);
+    if (!alreadyCloned) {
+      await mkdir(bareDir, { recursive: true });
+      const token = await this.getToken();
+      const cloneUrl = await this.vcs.getCloneUrl(repo, token);
       const git: SimpleGit = simpleGit({ baseDir: tmpdir() });
-      await git
-        .env({ ...process.env, GIT_ASKPASS: askpassPath })
-        .clone(cloneUrl, bareDir, ["--bare"]);
-    } finally {
-      await rm(askpassPath, { force: true });
+      await git.clone(cloneUrl, bareDir, ["--bare"]);
     }
 
     this.repoCaches.set(key, { bareDir });
     return bareDir;
   }
 
-  private async writeAskpass(): Promise<string> {
-    const token = await this.getToken();
-    // Token is an alphanumeric GitHub token — safe to embed directly in shell
-    const script = `#!/bin/sh\ncase "$1" in\n  Username*) echo x-access-token ;;\n  Password*) echo ${token} ;;\nesac\n`;
-    const path = join(tmpdir(), `raccoon-askpass-${String(Date.now())}.sh`);
-    await writeFile(path, script, { encoding: "utf8", mode: 0o700 });
-    await chmod(path, 0o700);
-    return path;
-  }
+
 }
 
 function repoKey(repo: RepoRef): string {

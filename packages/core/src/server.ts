@@ -1,4 +1,5 @@
 import process from "node:process";
+import { config as loadDotenv } from "dotenv";
 import { createServer } from "node:http";
 import { loadConfig } from "./config/loader.js";
 import { logger } from "./shared/logger.js";
@@ -18,6 +19,7 @@ import { processJob } from "./pipeline/index.js";
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 function main(): void {
+  loadDotenv();
   const config = loadConfig();
 
   logger.info({ config: config.redacted }, "raccoon starting");
