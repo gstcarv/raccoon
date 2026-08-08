@@ -27,7 +27,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Unit tests
-        run: pnpm --filter raccoon-core vitest run test/unit
+        run: pnpm --filter raccoon-core test -- test/unit
 
   e2e:
     name: E2E tests
@@ -45,4 +45,4 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: E2E tests
-        run: pnpm --filter raccoon-core vitest run test/e2e
+        run: pnpm --filter raccoon-core test -- test/e2e
