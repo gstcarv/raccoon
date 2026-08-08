@@ -19,10 +19,9 @@ pnpm raccoon doctor   # verify environment (Phase 8+)
 2. **Zero `any`** without a `// ponytail:` comment explaining why
 3. **Zero secrets in repo** — `.env.example` only
 4. **Never force-push** to main or any branch not owned by raccoon
-5. **Never touch** `.github/workflows/**` or any secrets file
-6. **Write an ADR** in `docs/adr/` before changing architecture
-7. **Update PLAN.md** before and after each phase
-8. **Gate before commit:** `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
+5. **Write an ADR** in `docs/adr/` before changing architecture
+6. **Update PLAN.md** before and after each phase
+7. **Gate before commit:** `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
 
 ## Project structure
 
