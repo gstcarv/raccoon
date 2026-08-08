@@ -1,4 +1,13 @@
+import { execSync } from "child_process";
 import { z } from "zod";
+
+function gitConfig(key: string): string {
+  try {
+    return execSync(`git config --global ${key}`, { encoding: "utf8" }).trim();
+  } catch {
+    return "";
+  }
+}
 
 const positiveInt = (def: number) =>
   z.coerce.number().int().positive().default(def);
@@ -33,8 +42,8 @@ export const envSchema = z.object({
     .default("info"),
 
   RACCOON_BASE_URL: z.string().url().default("http://localhost:3000"),
-  RACCOON_COAUTHOR_NAME: z.string().default("Raccoon Builder"),
-  RACCOON_COAUTHOR_EMAIL: z.string().default("raccoon-builder@noreply"),
+  RACCOON_COAUTHOR_NAME: z.string().default(gitConfig("user.name") || "Raccoon Builder"),
+  RACCOON_COAUTHOR_EMAIL: z.string().default(gitConfig("user.email") || "raccoon-builder@noreply"),
   RACCOON_WORKSPACE_DIR: z.string().default("./data/workspaces"),
   RACCOON_MAX_CONCURRENT_RUNS: positiveInt(3),
   RACCOON_RUN_TIMEOUT_MS: positiveInt(30 * 60 * 1000), // 30 min
