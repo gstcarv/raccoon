@@ -2,11 +2,12 @@
 
 # ── deps ───────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS deps
+# keep this stage --prod only; dev stage installs all deps separately
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/core/package.json ./packages/core/
-RUN corepack enable pnpm && pnpm install --frozen-lockfile --prod
+RUN corepack enable pnpm && pnpm install --frozen-lockfile --prod --ignore-scripts
 
 # ── build ──────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
@@ -17,6 +18,18 @@ COPY packages/core/src ./packages/core/src
 COPY packages/core/assets ./packages/core/assets
 RUN corepack enable pnpm && pnpm install --frozen-lockfile
 RUN pnpm build
+
+# ── dev (hot-reload, all deps, source mounted via volume) ──────────────────────
+FROM node:22-alpine AS dev
+RUN apk add --no-cache tini git
+WORKDIR /app
+RUN corepack enable pnpm
+# deps installed at build time; source is mounted at runtime
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY packages/core/package.json packages/core/tsconfig*.json ./packages/core/
+RUN pnpm install --frozen-lockfile
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["pnpm", "--filter", "core", "dev"]
 
 # ── runtime ────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runtime
