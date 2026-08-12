@@ -2,12 +2,11 @@
 
 # ── deps ───────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS deps
-# keep this stage --prod only; dev stage installs all deps separately
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/core/package.json ./packages/core/
-RUN corepack enable pnpm && pnpm install --frozen-lockfile --prod --ignore-scripts
+RUN corepack enable pnpm && pnpm install --frozen-lockfile --prod
 
 # ── build ──────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
@@ -33,7 +32,7 @@ CMD ["pnpm", "--filter", "core", "dev"]
 
 # ── runtime ────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runtime
-RUN apk add --no-cache tini git
+RUN apk add --no-cache tini git && npm install -g @anthropic-ai/claude-code
 WORKDIR /app
 
 # Non-root user
