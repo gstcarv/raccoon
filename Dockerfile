@@ -6,7 +6,8 @@ RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/core/package.json ./packages/core/
-RUN corepack enable pnpm && pnpm install --frozen-lockfile --prod
+RUN corepack enable pnpm && pnpm install --frozen-lockfile --prod --ignore-scripts && \
+    pnpm rebuild better-sqlite3
 
 # ── build ──────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
