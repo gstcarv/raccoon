@@ -76,7 +76,7 @@ async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
 // ── GitHubProjectsBoardProvider ───────────────────────────────────────────────
 
 export class GitHubProjectsBoardProvider implements BoardProvider {
-  readonly id = "github-projects";
+  readonly id = "github";
 
   private readonly auth: GitHubAuth;
   private fieldCache: FieldCache | null = null;
