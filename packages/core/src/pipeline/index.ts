@@ -26,6 +26,7 @@ export interface ManualTriggerPayload {
 // ── Pipeline entrypoint ───────────────────────────────────────────────────────
 
 export async function processJob(container: Container, job: Job): Promise<void> {
+  container.logger.info({ jobId: job.id, jobType: job.type }, "processing job");
   if (job.type === "BOARD_EVENT") {
     await handleBoardEvent(container, job.payload as unknown as BoardEventPayload);
   } else if (job.type === "MANUAL_TRIGGER") {
@@ -33,6 +34,8 @@ export async function processJob(container: Container, job: Job): Promise<void> 
   } else if (job.type === "RETRY_RUN") {
     const payload = job.payload as unknown as { runId: string };
     await resumeRun(container, payload.runId as RunId);
+  } else {
+    container.logger.warn({ jobType: job.type }, "unknown job type — skipping");
   }
 }
 
@@ -41,16 +44,29 @@ async function handleBoardEvent(
   payload: BoardEventPayload,
 ): Promise<void> {
   const { event, providerId } = payload;
-  const provider = container.boardProviders.get(providerId);
-  if (!provider) return;
+  container.logger.debug({ eventKind: event.kind, providerId, itemId: event.taskRef.itemId }, "board event received");
 
-  if (event.kind !== "TASK_MOVED" && event.kind !== "TASK_CREATED") return;
+  const provider = container.boardProviders.get(providerId);
+  if (!provider) {
+    container.logger.warn({ providerId }, "board provider not found — ignoring event");
+    return;
+  }
+
+  if (event.kind !== "TASK_MOVED" && event.kind !== "TASK_CREATED") {
+    container.logger.debug({ eventKind: event.kind }, "ignoring event kind");
+    return;
+  }
 
   const activeRuns = await container.runStore.listActive();
   const alreadyRunning = activeRuns.some((r) => r.taskRef.itemId === event.taskRef.itemId);
-  if (alreadyRunning) return;
+  if (alreadyRunning) {
+    container.logger.info({ itemId: event.taskRef.itemId }, "run already active for this task — skipping");
+    return;
+  }
 
+  container.logger.info({ itemId: event.taskRef.itemId }, "fetching task from board");
   const task = await provider.fetchTask(event.taskRef);
+  container.logger.info({ taskTitle: task.title, itemId: event.taskRef.itemId }, "task fetched");
   await startRun(container, task, providerId);
 }
 
@@ -58,6 +74,7 @@ async function handleManualTrigger(
   container: Container,
   payload: ManualTriggerPayload,
 ): Promise<void> {
+  container.logger.info({ taskTitle: payload.task.title, providerId: payload.providerId }, "manual trigger received");
   await startRun(container, payload.task, payload.providerId);
 }
 
@@ -91,11 +108,18 @@ async function startRun(container: Container, task: Task, _providerId: string): 
 }
 
 async function resumeRun(container: Container, runId: RunId): Promise<void> {
+  container.logger.info({ runId }, "resuming run");
   const run = await container.runStore.get(runId);
-  if (!run) return;
+  if (!run) {
+    container.logger.warn({ runId }, "run not found — cannot resume");
+    return;
+  }
 
   const provider = container.boardProviders.get(run.taskRef.provider);
-  if (!provider) return;
+  if (!provider) {
+    container.logger.warn({ runId, provider: run.taskRef.provider }, "board provider not found — cannot resume");
+    return;
+  }
 
   const task = await provider.fetchTask(run.taskRef);
   // executeRun handles the RETRYING → PREPARING transition internally
@@ -115,6 +139,7 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
 
   await moveBoard(container, currentRun, "IN_PROGRESS");
 
+  log.info({ branch: currentRun.branch, repo: `${task.repoRef.owner}/${task.repoRef.repo}` }, "preparing workspace");
   let workspace;
   try {
     workspace = await container.workspaceManager.prepare(
@@ -122,6 +147,7 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
       currentRun.id,
       currentRun.branch,
     );
+    log.info({ worktreePath: workspace.path }, "workspace ready");
   } catch (err) {
     await failRun(container, currentRun, err, "Workspace preparation failed");
     return;
@@ -167,6 +193,7 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
 
       const spec = await resolveAgent(def, taskVars, process.env);
 
+      log.info({ agentId, sessionId: currentRun.sessionId ?? "new" }, "invoking agent");
       const result = await container.runner.invoke(
         {
           runId: currentRun.id,
@@ -195,6 +222,11 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
         );
         return;
       }
+
+      log.info(
+        { agentId, exitCode: result.exitCode, durationMs: result.durationMs, costUsd: result.costUsd, sessionId: result.sessionId },
+        "agent finished",
+      );
 
       currentRun = {
         ...currentRun,
@@ -227,10 +259,11 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
   };
 
   const commitMsg = `feat: ${task.title}\n\nAutomated by Raccoon (run ${currentRun.id})`;
+  log.info("committing changes");
   const sha = await container.workspaceManager.commitAll(workspace, commitMsg, coAuthor);
 
   if (!sha) {
-    log.warn("No changes to commit — skipping PR");
+    log.warn("no changes to commit — skipping PR, marking done");
     await container.workspaceManager.dispose(workspace);
     const done = transitionRun(currentRun, "DONE", container.clock.now());
     await container.runStore.save(done);
@@ -238,9 +271,12 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
     return;
   }
 
+  log.info({ sha }, "changes committed, pushing branch");
   await container.workspaceManager.push(workspace);
+  log.info({ branch: currentRun.branch }, "branch pushed");
   await container.workspaceManager.dispose(workspace);
 
+  log.info("opening pull request");
   let pr;
   try {
     pr = await container.vcsProvider.openPullRequest({
@@ -256,6 +292,7 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
     return;
   }
 
+  log.info({ prUrl: pr.url }, "pull request opened");
   currentRun = { ...currentRun, prUrl: pr.url };
   await container.runStore.save(currentRun);
 
@@ -269,6 +306,7 @@ async function executeRun(container: Container, run: Run, task: Task): Promise<v
   const done = transitionRun(currentRun, "DONE", container.clock.now());
   await container.runStore.save(done);
   await moveBoard(container, done, "DONE");
+  log.info({ prUrl: currentRun.prUrl }, "run completed successfully");
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -297,7 +335,8 @@ async function moveBoard(
 ): Promise<void> {
   const provider = container.boardProviders.get(run.taskRef.provider);
   if (!provider) return;
+  container.logger.debug({ runId: run.id, status, itemId: run.taskRef.itemId }, "moving board card");
   await provider.moveTask(run.taskRef, status).catch((err: unknown) => {
-    container.logger.warn({ err, runId: run.id }, "Failed to move board card");
+    container.logger.warn({ err, runId: run.id, status }, "failed to move board card");
   });
 }

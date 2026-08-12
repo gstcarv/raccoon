@@ -6,6 +6,7 @@ import type { Readable } from "node:stream";
 import type { Runner, AgentInvocation, AgentRunResult } from "@/ports/runner.js";
 import type { Env } from "@/config/schema.js";
 import { mcpRefsToConfig, materializeMcpConfig } from "@/skills/mcp.js";
+import { logger } from "@/shared/logger.js";
 
 // NDJSON message types emitted by claude -p --output-format stream-json
 interface ClaudeMessage {
@@ -46,6 +47,9 @@ export class ClaudeCodeRunner implements Runner {
     let outputTokens = 0;
     let exitCode = 0;
 
+    const log = logger.child({ runId: input.runId, agentId: input.agent.id });
+    log.info({ model: input.agent.model ?? this.env.CLAUDE_MODEL, maxTurns: input.agent.maxTurns, outputPath }, "starting claude-code process");
+
     try {
       const args = this.buildArgs(input, mcpConfigPath);
       const procEnv = this.buildEnv(input, mcpConfigPath);
@@ -62,7 +66,10 @@ export class ClaudeCodeRunner implements Runner {
         logStream.write(line + "\n");
         try {
           const msg = JSON.parse(line) as ClaudeMessage;
-          if (msg.session_id) sessionId = msg.session_id;
+          if (msg.session_id) {
+            if (!sessionId) log.debug({ sessionId: msg.session_id }, "session started");
+            sessionId = msg.session_id;
+          }
           if (msg.usage) {
             inputTokens += msg.usage.input_tokens;
             outputTokens += msg.usage.output_tokens;
@@ -74,6 +81,7 @@ export class ClaudeCodeRunner implements Runner {
 
       const result = await proc;
       exitCode = result.exitCode ?? 1;
+      log.info({ exitCode, inputTokens, outputTokens }, "claude-code process exited");
     } finally {
       logStream.end();
       if (mcpDispose) await mcpDispose();
@@ -84,13 +92,15 @@ export class ClaudeCodeRunner implements Runner {
         ? inputTokens * COST_PER_INPUT_TOKEN + outputTokens * COST_PER_OUTPUT_TOKEN
         : null;
 
+    const durationMs = Date.now() - start;
+    log.info({ exitCode, costUsd, durationMs, outputPath }, "agent run complete");
     return {
       sessionId: sessionId || input.runId,
       exitCode,
       success: exitCode === 0,
       outputPath,
       costUsd,
-      durationMs: Date.now() - start,
+      durationMs,
     };
   }
 

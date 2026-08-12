@@ -10,11 +10,18 @@ async function processAsync(
   deliveryId: string,
 ): Promise<void> {
   const claimed = await container.runStore.claim(`delivery:${deliveryId}`);
-  if (!claimed) return;
+  if (!claimed) {
+    container.logger.debug({ deliveryId }, "delivery already claimed — skipping duplicate");
+    return;
+  }
 
   const event = await provider.parseEvent(rawReq);
-  if (!event) return;
+  if (!event) {
+    container.logger.debug({ deliveryId, providerId: provider.id }, "webhook parsed but no actionable event");
+    return;
+  }
 
+  container.logger.info({ deliveryId, eventKind: event.kind, itemId: event.taskRef.itemId }, "enqueueing board event");
   await container.jobQueue.enqueue({
     id: deliveryId,
     type: "BOARD_EVENT",
@@ -44,6 +51,7 @@ export function webhooksRouter(container: Container): Router {
 
       const isValid = await provider.verifyWebhook(rawReq);
       if (!isValid) {
+        container.logger.warn({ providerId, deliveryId: req.headers["x-github-delivery"] }, "webhook signature invalid");
         res
           .status(401)
           .json({ error: { code: "INVALID_SIGNATURE", message: "Invalid webhook signature" } });
@@ -53,6 +61,7 @@ export function webhooksRouter(container: Container): Router {
       const deliveryId =
         (req.headers["x-github-delivery"] as string | undefined) ?? randomUUID();
 
+      container.logger.info({ providerId, deliveryId, event: req.headers["x-github-event"] }, "webhook accepted");
       res.status(202).json({ message: "Accepted", deliveryId });
 
       processAsync(container, provider, rawReq, deliveryId).catch((err: unknown) => {
