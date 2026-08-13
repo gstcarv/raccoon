@@ -2,7 +2,6 @@ import mongoose, { Schema, type Model } from "mongoose";
 import type { RunStore } from "@/ports/run-store.js";
 import type { Run, RunId, RunEvent } from "@/domain/run/index.js";
 import type { RunState } from "@/domain/run/index.js";
-import type { BoardItemRef, RepoRef } from "@/domain/task/index.js";
 import type { BranchName, SessionId } from "@/domain/run/index.js";
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
@@ -10,23 +9,29 @@ import type { BranchName, SessionId } from "@/domain/run/index.js";
 const runSchema = new Schema(
   {
     _id: String,
-    taskProvider: { type: String, required: true },
-    taskProjectId: { type: String, required: true },
-    taskItemId: { type: String, required: true },
-    repoOwner: { type: String, required: true },
-    repoName: { type: String, required: true },
+    task: {
+      provider: { type: String, required: true },
+      projectId: { type: String, required: true },
+      itemId: { type: String, required: true },
+    },
+    repo: {
+      owner: { type: String, required: true },
+      name: { type: String, required: true },
+    },
     branch: { type: String, required: true },
     worktreePath: { type: String, required: true },
     state: { type: String, required: true },
     attempts: { type: Number, required: true, default: 0 },
-    createdAt: { type: String, required: true },
-    updatedAt: { type: String, required: true },
-    startedAt: String,
-    completedAt: String,
-    prUrl: String,
-    sessionId: String,
-    errorMessage: String,
     currentAgent: String,
+    sessionId: String,
+    prUrl: String,
+    errorMessage: String,
+    timestamps: {
+      createdAt: { type: Date, required: true },
+      updatedAt: { type: Date, required: true },
+      startedAt: Date,
+      completedAt: Date,
+    },
   },
   { _id: false },
 );
@@ -34,10 +39,10 @@ const runSchema = new Schema(
 const eventSchema = new Schema(
   {
     _id: String,
-    runId: { type: String, required: true },
+    runId: { type: String, required: true, index: true },
     kind: { type: String, required: true },
-    payload: { type: String, required: true },
-    createdAt: { type: String, required: true },
+    payload: { type: Schema.Types.Mixed, required: true },
+    createdAt: { type: Date, required: true },
   },
   { _id: false },
 );
@@ -45,7 +50,7 @@ const eventSchema = new Schema(
 const idempotencySchema = new Schema(
   {
     _id: String,
-    claimedAt: { type: String, required: true },
+    claimedAt: { type: Date, required: true },
   },
   { _id: false },
 );
@@ -54,23 +59,22 @@ const idempotencySchema = new Schema(
 
 interface RunDoc {
   _id: string;
-  taskProvider: string;
-  taskProjectId: string;
-  taskItemId: string;
-  repoOwner: string;
-  repoName: string;
+  task: { provider: string; projectId: string; itemId: string };
+  repo: { owner: string; name: string };
   branch: string;
   worktreePath: string;
   state: string;
   attempts: number;
-  createdAt: string;
-  updatedAt: string;
-  startedAt?: string;
-  completedAt?: string;
-  prUrl?: string;
-  sessionId?: string;
-  errorMessage?: string;
   currentAgent?: string;
+  sessionId?: string;
+  prUrl?: string;
+  errorMessage?: string;
+  timestamps: {
+    createdAt: Date;
+    updatedAt: Date;
+    startedAt?: Date;
+    completedAt?: Date;
+  };
 }
 
 const ACTIVE_STATES = [
@@ -90,19 +94,19 @@ function docToRun(doc: RunDoc): Run {
   return {
     id: doc._id as RunId,
     taskRef: {
-      provider: doc.taskProvider,
-      projectId: doc.taskProjectId,
-      itemId: doc.taskItemId,
-    } satisfies BoardItemRef,
-    repoRef: { owner: doc.repoOwner, repo: doc.repoName } satisfies RepoRef,
+      provider: doc.task.provider,
+      projectId: doc.task.projectId,
+      itemId: doc.task.itemId,
+    },
+    repoRef: { owner: doc.repo.owner, repo: doc.repo.name },
     branch: doc.branch as BranchName,
     worktreePath: doc.worktreePath,
     state: doc.state as RunState,
     attempts: doc.attempts,
-    createdAt: new Date(doc.createdAt),
-    updatedAt: new Date(doc.updatedAt),
-    startedAt: doc.startedAt ? new Date(doc.startedAt) : null,
-    completedAt: doc.completedAt ? new Date(doc.completedAt) : null,
+    createdAt: doc.timestamps.createdAt,
+    updatedAt: doc.timestamps.updatedAt,
+    startedAt: doc.timestamps.startedAt ?? null,
+    completedAt: doc.timestamps.completedAt ?? null,
     prUrl: doc.prUrl ?? null,
     sessionId: (doc.sessionId as SessionId | null) ?? null,
     errorMessage: doc.errorMessage ?? null,
@@ -113,23 +117,26 @@ function docToRun(doc: RunDoc): Run {
 function runToDoc(run: Run) {
   return {
     _id: run.id,
-    taskProvider: run.taskRef.provider,
-    taskProjectId: run.taskRef.projectId,
-    taskItemId: run.taskRef.itemId,
-    repoOwner: run.repoRef.owner,
-    repoName: run.repoRef.repo,
+    task: {
+      provider: run.taskRef.provider,
+      projectId: run.taskRef.projectId,
+      itemId: run.taskRef.itemId,
+    },
+    repo: { owner: run.repoRef.owner, name: run.repoRef.repo },
     branch: run.branch,
     worktreePath: run.worktreePath,
     state: run.state,
     attempts: run.attempts,
-    createdAt: run.createdAt.toISOString(),
-    updatedAt: run.updatedAt.toISOString(),
-    startedAt: run.startedAt?.toISOString(),
-    completedAt: run.completedAt?.toISOString(),
-    prUrl: run.prUrl ?? undefined,
-    sessionId: run.sessionId ?? undefined,
-    errorMessage: run.errorMessage ?? undefined,
     currentAgent: run.currentAgent ?? undefined,
+    sessionId: run.sessionId ?? undefined,
+    prUrl: run.prUrl ?? undefined,
+    errorMessage: run.errorMessage ?? undefined,
+    timestamps: {
+      createdAt: run.createdAt,
+      updatedAt: run.updatedAt,
+      startedAt: run.startedAt ?? undefined,
+      completedAt: run.completedAt ?? undefined,
+    },
   };
 }
 
@@ -175,14 +182,14 @@ export class MongoRunStore implements RunStore {
       _id: event.id,
       runId: event.runId,
       kind: event.kind,
-      payload: JSON.stringify(event.payload),
-      createdAt: event.createdAt.toISOString(),
+      payload: event.payload,
+      createdAt: event.createdAt,
     });
   }
 
   async claim(key: string): Promise<boolean> {
     try {
-      await this.Idempotency.create({ _id: key, claimedAt: new Date().toISOString() });
+      await this.Idempotency.create({ _id: key, claimedAt: new Date() });
       return true;
     } catch {
       return false;
