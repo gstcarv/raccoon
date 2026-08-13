@@ -172,9 +172,18 @@ export class GitHubProjectsBoardProvider implements BoardProvider {
     };
   }
 
+  private static readonly STATUS_LABEL: Record<CanonicalBoardStatus, string[]> = {
+    BACKLOG: ["Backlog", "BACKLOG"],
+    IN_PROGRESS: ["In progress", "In Progress", "IN_PROGRESS"],
+    IN_REVIEW: ["In review", "In Review", "IN_REVIEW"],
+    DONE: ["Done", "DONE"],
+    BLOCKED: ["Blocked", "BLOCKED"],
+  };
+
   async moveTask(ref: BoardItemRef, status: CanonicalBoardStatus): Promise<void> {
     const cache = await this.getFieldCache(ref.projectId);
-    const optionId = cache.optionsByName.get(status);
+    const candidates = GitHubProjectsBoardProvider.STATUS_LABEL[status];
+    const optionId = candidates.map((c) => cache.optionsByName.get(c)).find(Boolean);
     if (!optionId) return;
 
     const token = await this.auth.getToken();
