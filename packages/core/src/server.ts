@@ -12,6 +12,7 @@ import { GitHubVcsProvider } from "./adapters/vcs/github/index.js";
 import { ClaudeCodeRunner } from "./adapters/agent/claude-code/index.js";
 import { GitWorkspaceManager } from "./adapters/workspaces/git-workspace-manager.js";
 import { SqliteRunStore } from "./adapters/store/sqlite-run-store.js";
+import { MongoRunStore } from "./adapters/store/mongo-run-store.js";
 import { MemoryRunStore } from "./adapters/store/memory-run-store.js";
 import { InMemoryQueue } from "./adapters/queue/in-memory-queue.js";
 import { BullMQQueue } from "./adapters/queue/bullmq-queue.js";
@@ -44,9 +45,11 @@ async function main(): Promise<void> {
   const runner = new ClaudeCodeRunner(config.env);
   const workspaceManager = new GitWorkspaceManager(vcsProvider, config.env, getToken);
 
-  const runStore = config.env.DATABASE_URL.startsWith("file:")
-    ? new SqliteRunStore(config.env.DATABASE_URL)
-    : new MemoryRunStore();
+  const runStore = config.env.DATABASE_URL.startsWith("mongodb")
+    ? await MongoRunStore.connect(config.env.DATABASE_URL)
+    : config.env.DATABASE_URL.startsWith("file:")
+      ? new SqliteRunStore(config.env.DATABASE_URL)
+      : new MemoryRunStore();
 
   const jobQueue = config.env.REDIS_URL
     ? new BullMQQueue(config.env.REDIS_URL)
